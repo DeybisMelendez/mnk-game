@@ -205,13 +205,11 @@ class MNKGameAI {
 
 const mnkGame = new MNKGameAI(4,4,3)
 
-for (let i = 0; i < mnkGame.size; i++) {
+/*for (let i = 0; i <= mnkGame.size; i++) {
     mnkGame.memo = {}
     let start = performance.now()
     let nodes = mnkGame.perft(i)
     let end = performance.now()
     console.log(i,nodes,end-start)
-}
-
-//let nodes = mnkGame.negamax()
-//console.log(nodes)
+}*/
+console.log(mnkGame.negamax())

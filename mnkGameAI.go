@@ -170,7 +170,7 @@ func (game *MNKGameAI) negamax() int8 {
 		}
 	}
 	if game.isEndGame() {
-		return -game.turn
+		return -game.turn * game.turn
 	}
 	if game.isDraw() {
 		return 0
@@ -226,12 +226,17 @@ func (game *MNKGameAI) perft(depth int) uint {
 }
 
 func main() {
-	mnkGame := NewMNKGameAI(4, 3, 3)
-	for i := 0; i < mnkGame.size; i++ {
+	mnkGame := NewMNKGameAI(3, 3, 3)
+	/*for i := 0; i <= mnkGame.size; i++ {
 		mnkGame.memo = make(map[uint64]MemoEntry)
 		start := time.Now()
 		nodes := mnkGame.perft(i)
 		end := time.Now()
 		fmt.Printf("%d %d %v\n", i, nodes, end.Sub(start))
-	}
+	}*/
+	solution := mnkGame.negamax()
+	fmt.Println(solution)
+	mnkGame.memo = make(map[uint64]MemoEntry)
+	nodes := mnkGame.perft(mnkGame.size)
+	fmt.Println(nodes)
 }

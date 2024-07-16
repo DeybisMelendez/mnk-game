@@ -53,15 +53,32 @@ class MNKGameAI {
         this.n = n
         this.k = k
         this.size = m*n
+        this.board = [
+            0, // Tablero Primer jugador
+            0, // Tablero Segundo jugador
+        ]
+        this.turn = 1
+        this.memo = {}
+        this.memoSize = 1*1024*1024/32 // 1GB
+        this.FIRST_PLAYER = 0
+        this.SECOND_PLAYER = 1
+        this.zobristTable = this.initializeZobrist();
+        this.currentHash = 0;
     }
-    board = [
-        0, // Tablero Primer jugador
-        0, // Tablero Segundo jugador
-    ]
-    turn = 1
-    memo = {}
-    FIRST_PLAYER = 0
-    SECOND_PLAYER = 1
+    
+    initializeZobrist() {
+        let zobristTable = [];
+        for (let i = 0; i < this.size; i++) {
+            zobristTable.push([this.random(), this.random()]);
+        }
+        zobristTable.push(this.random()); // turn
+        return zobristTable;
+    }
+
+    random() {
+        let sign = Math.floor(Math.random()) ? 1 : -1
+        return Math.floor(Math.random()*Math.pow(2,32) * sign)
+    }
 
     generateMoves() {
         let moves = []
@@ -73,22 +90,23 @@ class MNKGameAI {
         }
         return moves
     }
+
     makeMove(move) {
-        if (this.turn == 1) {
-            this.board[this.FIRST_PLAYER] |= this.movePattern[move]
-        } else {
-            this.board[this.SECOND_PLAYER] |= this.movePattern[move]
-        }
-        this.turn *=-1
+        const player = this.turn === 1 ? this.FIRST_PLAYER : this.SECOND_PLAYER
+        this.board[player] |= this.movePattern[move]
+        this.turn *= -1
+
+        this.currentHash ^= this.zobristTable[move][player]
+        this.currentHash ^= this.zobristTable[this.size]  
     }
-    
+
     unMakeMove(move) {
-        this.turn *=-1
-        if (this.turn == 1) {
-            this.board[this.FIRST_PLAYER] ^= this.movePattern[move]
-        } else {
-            this.board[this.SECOND_PLAYER] ^= this.movePattern[move]
-        }
+        this.turn *= -1
+        const player = this.turn === 1 ? this.FIRST_PLAYER : this.SECOND_PLAYER
+        this.board[player] ^= this.movePattern[move]
+
+        this.currentHash ^= this.zobristTable[move][player]
+        this.currentHash ^= this.zobristTable[this.size]
     }
 
     isDraw() {
@@ -97,6 +115,7 @@ class MNKGameAI {
         }
         return false
     }
+
     isEndGame() {
         for (let i = 0; i < this.winPattern.length; i++) {
             if ((this.board[this.FIRST_PLAYER] & this.winPattern[i]) == this.winPattern[i] ||
@@ -106,18 +125,20 @@ class MNKGameAI {
         }
         return false
     }
+
     negamax() {
+        let hash = this.currentHash%this.memoSize
+        let memoValue = this.memo[hash] 
+        if (memoValue !== undefined) {
+            if (memoValue.board1 == this.board[0] &&
+                memoValue.board2 == this.board[1] &&
+                memoValue.turn == this.turn)
+            return memoValue.score
+        }
         if (this.isEndGame()) {
             return -this.turn * this.turn
         } else if (this.isDraw()) {
             return 0
-        }
-        let keyMemo = (this.board[0] | (1 << this.size)) | this.board[1]
-        keyMemo |= this.turn == 1 ? 1 << this.size + 1 : 0
-        //let keyMemo = this.board[0].toString() + "-" + this.board[1].toString() + "-"+ this.turn.toString()
-        let valueMemo = this.memo[keyMemo]
-        if (valueMemo !== undefined) {
-            return valueMemo
         }
         let moves = this.generateMoves()
         let maxScore = -1000
@@ -126,7 +147,12 @@ class MNKGameAI {
             let score = -this.negamax()
             maxScore = Math.max(maxScore, score)
             this.unMakeMove(moves[i])
-            this.memo[keyMemo] = score
+        }
+        this.memo[hash] = {
+            board1 : this.board[0],
+            board2 : this.board[1],
+            turn : this.turn,
+            score : maxScore
         }
         return maxScore
     }
@@ -144,42 +170,20 @@ class MNKGameAI {
             }
             this.unMakeMove(moves[i])
         }
-        return this.movePattern.indexOf(bestMove)
+        return bestMove
     }
-    // Para contar estadísticas
-    firstPlayerWinCount = 0
-    secondPlayerWinCount = 0
-    drawsCount = 0
 
-    isFirstPlayerWin() {
-        for (let i = 0; i < this.winPattern.length; i++) {
-            if ((this.board[this.FIRST_PLAYER] & this.winPattern[i]) == this.winPattern[i]) {
-                return true
-            }
-        }
-        return false
-    }
-    isSecondPlayerWin() {
-        for (let i = 0; i < this.winPattern.length; i++) {
-            if ((this.board[this.SECOND_PLAYER] & this.winPattern[i]) == this.winPattern[i]) {
-                return true
-            }
-        }
-        return false
-    }
-    
     perft(depth) {
-        if (this.isFirstPlayerWin()) {
-            this.firstPlayerWinCount++
-            return 1
-        } else if (this.isSecondPlayerWin()) {
-            this.secondPlayerWinCount++
-            return 1
-        } else if (this.isDraw()) {
-            this.drawsCount++
-            return 1
+        let hash = this.currentHash%this.memoSize
+        let memoValue = this.memo[hash]
+        if (memoValue !== undefined) {
+            if (memoValue.board1 == this.board[0] &&
+                memoValue.board2 == this.board[1] &&
+                memoValue.turn == this.turn) {
+                return memoValue.total
+            }
         }
-        if (depth == 0) {
+        if (this.isEndGame() || this.isDraw() || depth == 0) {
             return 1
         }
         let total = 0
@@ -189,10 +193,25 @@ class MNKGameAI {
             total += this.perft(depth-1)
             this.unMakeMove(moves[i])
         }
+        this.memo[hash] = {
+            board1 : this.board[0],
+            board2 : this.board[1],
+            turn : this.turn,
+            total : total
+        }
         return total
     }
 }
 
-const mnkGame = new MNKGameAI(4,4,4)
+const mnkGame = new MNKGameAI(4,3,3)
 
-console.log(mnkGame.negamax())
+for (let i = 0; i < mnkGame.size+1; i++) {
+    mnkGame.memo = {}
+    let start = performance.now()
+    let nodes = mnkGame.perft(i)
+    let end = performance.now()
+    console.log(i,nodes,end-start)
+}
+
+//let nodes = mnkGame.negamax()
+//console.log(nodes)

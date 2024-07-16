@@ -59,7 +59,7 @@ class MNKGameAI {
         ]
         this.turn = 1
         this.memo = {}
-        this.memoSize = 1*1024*1024/32 // 1GB
+        this.memoSize = 1*1024*1024*1024/32 // 1GB
         this.FIRST_PLAYER = 0
         this.SECOND_PLAYER = 1
         this.zobristTable = this.initializeZobrist();
@@ -203,9 +203,9 @@ class MNKGameAI {
     }
 }
 
-const mnkGame = new MNKGameAI(4,3,3)
+const mnkGame = new MNKGameAI(4,4,3)
 
-for (let i = 0; i < mnkGame.size+1; i++) {
+for (let i = 0; i < mnkGame.size; i++) {
     mnkGame.memo = {}
     let start = performance.now()
     let nodes = mnkGame.perft(i)
